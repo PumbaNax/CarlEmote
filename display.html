@@ -4,20 +4,25 @@
   <meta charset="UTF-8">
   <title>Emote Display</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+    }
     
-    body {
+    html, body {
+      width: 100vw;
+      height: 100vh;
       background-color: #0e0e10;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
       overflow: hidden;
     }
 
     #emote-container {
-      width: 80vw;
-      height: 80vh;
+      width: 100vw;
+      height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -31,14 +36,14 @@
     }
 
     #emote-img {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
+      width: 90vw;
+      height: 90vh;
+      object-fit: contain; /* Skaliert das Emote maximal groß, ohne es zu verzerren */
     }
 
     @keyframes pulse {
       0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.08); }
+      50% { transform: scale(1.03); }
     }
   </style>
 </head>
@@ -50,7 +55,7 @@
 
   <script>
     // === DEIN KANALNAME HIER KLEINGESCHRIEBEN EINTRAGEN ===
-    const CHANNEL_NAME = 'carlzon_official'; 
+    const CHANNEL_NAME = 'pumbanax'; 
     const INTERVAL_TIME = 10000; // 10 Sekunden
 
     let emotePool = [];
@@ -96,12 +101,11 @@
       let selectedEmoteUrl = "";
 
       if (emotePool.length > 0) {
-        // Ein Emote aus dem Chat-Speicher wählen
         const randomIndex = Math.floor(Math.random() * emotePool.length);
         selectedEmoteUrl = emotePool[randomIndex];
-        emotePool = []; // Speicher nach Auswahl leeren
+        emotePool = []; 
       } else {
-        // Fallback: Test-Emote anzeigen, wenn kein Emote im Chat war
+        // Fallback: Test-Emote anzeigen, wenn noch kein Emote im Chat war
         selectedEmoteUrl = "https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_dc2720d207f24090bdc6e26b1d44f6f2/default/dark/3.0";
       }
 
@@ -113,8 +117,7 @@
       }, 500);
     }
 
-    // Beim Laden sofort einmal ausführen und danach alle 30 Sekunden
-    setTimeout(displayRandomEmote, 2000);
+    setTimeout(displayRandomEmote, 1000);
     setInterval(displayRandomEmote, INTERVAL_TIME);
   </script>
 </body>
