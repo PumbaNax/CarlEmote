@@ -38,7 +38,7 @@
     #emote-img {
       width: 90vw;
       height: 90vh;
-      object-fit: contain; /* Skaliert das Emote maximal groß, ohne es zu verzerren */
+      object-fit: contain;
     }
 
     @keyframes pulse {
@@ -54,13 +54,12 @@
   </div>
 
   <script>
-    // === DEIN KANALNAME HIER KLEINGESCHRIEBEN EINTRAGEN ===
     const CHANNEL_NAME = 'pumbanax'; 
     const INTERVAL_TIME = 10000; // 10 Sekunden
 
     let emotePool = [];
+    let lastDisplayedEmote = ""; // Speichert das zuletzt gezeigte Emote
 
-    // Verbinden mit dem Twitch Chat WebSocket
     const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
 
     ws.onopen = () => {
@@ -78,7 +77,6 @@
         return;
       }
 
-      // Prüfen auf Emotes in Chat-Nachrichten
       if (message.includes('PRIVMSG')) {
         const emoteMatch = message.match(/emotes=([^;]+)/);
         if (emoteMatch && emoteMatch[1]) {
@@ -98,25 +96,25 @@
       const container = document.getElementById('emote-container');
       const img = document.getElementById('emote-img');
 
-      let selectedEmoteUrl = "";
-
+      // Wenn NEUE Emotes im Pool sind, wählen wir ein zufälliges aus
       if (emotePool.length > 0) {
         const randomIndex = Math.floor(Math.random() * emotePool.length);
-        selectedEmoteUrl = emotePool[randomIndex];
-        emotePool = []; 
-      } else {
-        // Fallback: Test-Emote anzeigen, wenn noch kein Emote im Chat war
-        selectedEmoteUrl = "https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_dc2720d207f24090bdc6e26b1d44f6f2/default/dark/3.0";
-      }
+        lastDisplayedEmote = emotePool[randomIndex];
+        emotePool = []; // Speicher nach Auswahl leeren
 
-      container.classList.remove('show');
+        // Nur wenn wir wirklich ein neues Emote haben, lassen wir es neu einblenden
+        container.classList.remove('show');
 
-      setTimeout(() => {
-        img.src = selectedEmoteUrl;
-        container.classList.add('show');
-      }, 500);
+        setTimeout(() => {
+          img.src = lastDisplayedEmote;
+          container.classList.add('show');
+        }, 500);
+      } 
+      // Falls der Speicher leer ist, machen wir einfach GAR NICHTS.
+      // Das aktuell angezeigte Emote bleibt dadurch dauerhaft auf dem Schirm stehen!
     }
 
+    // Beim allerersten Start kurz warten
     setTimeout(displayRandomEmote, 1000);
     setInterval(displayRandomEmote, INTERVAL_TIME);
   </script>
