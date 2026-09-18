@@ -60,6 +60,7 @@
     let emotePool = [];
     let lastDisplayedEmote = "";
 
+    // WebSocket-Verbindung zum Twitch Chat
     const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
 
     ws.onopen = () => {
@@ -72,23 +73,46 @@
     ws.onmessage = (event) => {
       const message = event.data;
 
+      // Keep-Alive Antwort für Twitch
       if (message.startsWith('PING')) {
         ws.send('PONG :tmi.twitch.tv');
         return;
       }
 
       if (message.includes('PRIVMSG')) {
+        // Methode 1: Über offizielle Twitch-Emote-Tags
         const emoteMatch = message.match(/emotes=([^;]+)/);
         if (emoteMatch && emoteMatch[1]) {
           const emoteEntries = emoteMatch[1].split('/');
           emoteEntries.forEach(entry => {
             const emoteId = entry.split(':')[0];
             if (emoteId) {
-              const emoteUrl = `https://static-cdn.jtvnw.net/emoticons/v2/${emoteId}/default/dark/3.0`;
-              emotePool.push(emoteUrl);
+              emotePool.push(`https://static-cdn.jtvnw.net/emoticons/v2/${emoteId}/default/dark/3.0`);
             }
           });
         }
+
+        // Methode 2: Direkt-Filter für bekannte globale Twitch-Emotes im Chattext
+        const chatText = message.split(`PRIVMSG #${CHANNEL_NAME.toLowerCase()} :`)[1] || "";
+        
+        const globalEmotes = {
+          'lul': '425618',
+          'kappa': '25',
+          'pogchamp': '305954156',
+          'heyguys': '30259',
+          'kreygasm': '41',
+          'trihard': '120232',
+          'notlikethis': '58765',
+          'bleedpurple': '62835',
+          'seemsgood': '64138'
+        };
+
+        const words = chatText.toLowerCase().trim().split(' ');
+        words.forEach(word => {
+          if (globalEmotes[word]) {
+            emotePool.push(`https://static-cdn.jtvnw.net/emoticons/v2/${globalEmotes[word]}/default/dark/3.0`);
+          }
+        });
       }
     };
 
@@ -96,13 +120,11 @@
       const container = document.getElementById('emote-container');
       const img = document.getElementById('emote-img');
 
-      // NUR ausführen, wenn wirklich NEUE Emotes im Speicher angekommen sind!
       if (emotePool.length > 0) {
         const randomIndex = Math.floor(Math.random() * emotePool.length);
         lastDisplayedEmote = emotePool[randomIndex];
-        emotePool = []; // Speicher leeren
+        emotePool = [];
 
-        // Altes Emote ausblenden und neues Emote einblenden
         container.classList.remove('show');
 
         setTimeout(() => {
@@ -110,10 +132,8 @@
           container.classList.add('show');
         }, 500);
       }
-      // Wenn emotePool leer ist, passiert NICHTS – das aktuell angezeigte Bild bleibt dauerhaft stehen.
     }
 
-    // Alle 10 Sekunden prüfen, ob ein neues Emote im Chat war
     setInterval(displayRandomEmote, INTERVAL_TIME);
   </script>
 </body>
