@@ -55,10 +55,10 @@
 
   <script>
     const CHANNEL_NAME = 'pumbanax'; 
-    const INTERVAL_TIME = 10000; // 10 Sekunden
+    const INTERVAL_TIME = 10000; // 10 Sekunden Intervall
 
     let emotePool = [];
-    let lastDisplayedEmote = ""; // Speichert das zuletzt gezeigte Emote
+    let lastDisplayedEmote = "";
 
     const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
 
@@ -96,26 +96,24 @@
       const container = document.getElementById('emote-container');
       const img = document.getElementById('emote-img');
 
-      // Wenn NEUE Emotes im Pool sind, wählen wir ein zufälliges aus
+      // NUR ausführen, wenn wirklich NEUE Emotes im Speicher angekommen sind!
       if (emotePool.length > 0) {
         const randomIndex = Math.floor(Math.random() * emotePool.length);
         lastDisplayedEmote = emotePool[randomIndex];
-        emotePool = []; // Speicher nach Auswahl leeren
+        emotePool = []; // Speicher leeren
 
-        // Nur wenn wir wirklich ein neues Emote haben, lassen wir es neu einblenden
+        // Altes Emote ausblenden und neues Emote einblenden
         container.classList.remove('show');
 
         setTimeout(() => {
           img.src = lastDisplayedEmote;
           container.classList.add('show');
         }, 500);
-      } 
-      // Falls der Speicher leer ist, machen wir einfach GAR NICHTS.
-      // Das aktuell angezeigte Emote bleibt dadurch dauerhaft auf dem Schirm stehen!
+      }
+      // Wenn emotePool leer ist, passiert NICHTS – das aktuell angezeigte Bild bleibt dauerhaft stehen.
     }
 
-    // Beim allerersten Start kurz warten
-    setTimeout(displayRandomEmote, 1000);
+    // Alle 10 Sekunden prüfen, ob ein neues Emote im Chat war
     setInterval(displayRandomEmote, INTERVAL_TIME);
   </script>
 </body>
