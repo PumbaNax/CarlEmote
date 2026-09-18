@@ -55,12 +55,11 @@
 
   <script>
     const CHANNEL_NAME = 'pumbanax'; 
-    const INTERVAL_TIME = 10000; // 10 Sekunden Intervall
+    const INTERVAL_TIME = 30000; // 30 Sekunden
 
     let emotePool = [];
-    let lastDisplayedEmote = "";
+    let lastDisplayedEmote = ""; // Speichert das zuletzt gezeigte Emote
 
-    // WebSocket-Verbindung zum Twitch Chat
     const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
 
     ws.onopen = () => {
@@ -73,46 +72,23 @@
     ws.onmessage = (event) => {
       const message = event.data;
 
-      // Keep-Alive Antwort für Twitch
       if (message.startsWith('PING')) {
         ws.send('PONG :tmi.twitch.tv');
         return;
       }
 
       if (message.includes('PRIVMSG')) {
-        // Methode 1: Über offizielle Twitch-Emote-Tags
         const emoteMatch = message.match(/emotes=([^;]+)/);
         if (emoteMatch && emoteMatch[1]) {
           const emoteEntries = emoteMatch[1].split('/');
           emoteEntries.forEach(entry => {
             const emoteId = entry.split(':')[0];
             if (emoteId) {
-              emotePool.push(`https://static-cdn.jtvnw.net/emoticons/v2/${emoteId}/default/dark/3.0`);
+              const emoteUrl = `https://static-cdn.jtvnw.net/emoticons/v2/${emoteId}/default/dark/3.0`;
+              emotePool.push(emoteUrl);
             }
           });
         }
-
-        // Methode 2: Direkt-Filter für bekannte globale Twitch-Emotes im Chattext
-        const chatText = message.split(`PRIVMSG #${CHANNEL_NAME.toLowerCase()} :`)[1] || "";
-        
-        const globalEmotes = {
-          'lul': '425618',
-          'kappa': '25',
-          'pogchamp': '305954156',
-          'heyguys': '30259',
-          'kreygasm': '41',
-          'trihard': '120232',
-          'notlikethis': '58765',
-          'bleedpurple': '62835',
-          'seemsgood': '64138'
-        };
-
-        const words = chatText.toLowerCase().trim().split(' ');
-        words.forEach(word => {
-          if (globalEmotes[word]) {
-            emotePool.push(`https://static-cdn.jtvnw.net/emoticons/v2/${globalEmotes[word]}/default/dark/3.0`);
-          }
-        });
       }
     };
 
@@ -120,20 +96,26 @@
       const container = document.getElementById('emote-container');
       const img = document.getElementById('emote-img');
 
+      // Wenn NEUE Emotes im Pool sind, wählen wir ein zufälliges aus
       if (emotePool.length > 0) {
         const randomIndex = Math.floor(Math.random() * emotePool.length);
         lastDisplayedEmote = emotePool[randomIndex];
-        emotePool = [];
+        emotePool = []; // Speicher nach Auswahl leeren
 
+        // Nur wenn wir wirklich ein neues Emote haben, lassen wir es neu einblenden
         container.classList.remove('show');
 
         setTimeout(() => {
           img.src = lastDisplayedEmote;
           container.classList.add('show');
         }, 500);
-      }
+      } 
+      // Falls der Speicher leer ist, machen wir einfach GAR NICHTS.
+      // Das aktuell angezeigte Emote bleibt dadurch dauerhaft auf dem Schirm stehen!
     }
 
+    // Beim allerersten Start kurz warten
+    setTimeout(displayRandomEmote, 1000);
     setInterval(displayRandomEmote, INTERVAL_TIME);
   </script>
 </body>
