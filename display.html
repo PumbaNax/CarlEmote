@@ -15,15 +15,26 @@
     #emote-container {
       width: 100vw; height: 100vh;
       display: flex; justify-content: center; align-items: center;
-      opacity: 0; transition: opacity 0.5s ease-in-out;
+      opacity: 0;
+      transform: translateX(100vw);
     }
+
+    /* Vollständiger Durchlauf von rechts nach links */
     #emote-container.show {
-      opacity: 1; animation: pulse 2.5s infinite ease-in-out;
+      opacity: 1;
+      animation: marquee 4s linear forwards;
     }
-    #emote-img { width: 90vw; height: 90vh; object-fit: contain; }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.03); }
+
+    #emote-img { width: 85vw; height: 85vh; object-fit: contain; }
+
+    /* Von 100vw (ganz rechts) bis -100vw (ganz links raus) */
+    @keyframes marquee {
+      0% {
+        transform: translateX(100vw);
+      }
+      100% {
+        transform: translateX(-100vw);
+      }
     }
   </style>
 </head>
@@ -35,14 +46,13 @@
 
   <script>
     const CHANNEL_NAME = 'carlzon_official';
-    const CHECK_INTERVAL = 2000;
+    const CHECK_INTERVAL = 1000;
     
     let ws = null;
     let emotePool = [];
-    let lastDisplayedEmote = "";
+    let isAnimating = false;
     let pingInterval = null;
 
-    // Wörterbuch für Drittanbieter-Emotes (Wort -> Bild-URL)
     const thirdPartyEmotes = {};
 
     const GLOBAL_EMOTES = {
@@ -56,15 +66,12 @@
       'biblethump': '86'
     };
 
-    // 1. Drittanbieter-Emotes laden (7TV & BTTV)
     async function loadThirdPartyEmotes() {
       try {
-        // Helix/Twitch ID für den Kanal abfragen via Decapi (Hilfs-API für unauthentifizierte IDs)
         const idRes = await fetch(`https://decapi.me/twitch/id/${CHANNEL_NAME}`);
         const userId = (await idRes.text()).trim();
 
         if (userId && !isNaN(userId)) {
-          // BTTV Channel Emotes
           fetch(`https://api.betterttv.net/3/cached/users/twitch/${userId}`)
             .then(res => res.json())
             .then(data => {
@@ -74,7 +81,6 @@
               });
             }).catch(() => {});
 
-          // 7TV Channel Emotes
           fetch(`https://7tv.io/v3/users/twitch/${userId}`)
             .then(res => res.json())
             .then(data => {
@@ -85,12 +91,9 @@
               }
             }).catch(() => {});
         }
-      } catch (err) {
-        // Stillschweigend fortfahren, falls API offline ist
-      }
+      } catch (err) {}
     }
 
-    // 2. Twitch Websocket Verbindung
     function connectToTwitch() {
       ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
 
@@ -116,7 +119,6 @@
         }
 
         if (message.includes('PRIVMSG')) {
-          // A) Offizielle Twitch-Metadata Tags
           const emoteMatch = message.match(/emotes=([^;]+)/);
           if (emoteMatch && emoteMatch[1] && emoteMatch[1].trim() !== '') {
             const emoteEntries = emoteMatch[1].split('/');
@@ -128,19 +130,15 @@
             });
           }
 
-          // B) Text-Prüfung für BTTV, 7TV und Globale Emotes
           const chatParts = message.split(`PRIVMSG #${CHANNEL_NAME.toLowerCase()} :`);
           if (chatParts.length > 1) {
             const chatText = chatParts[1].trim();
             const words = chatText.split(/\s+/);
 
             words.forEach(word => {
-              // Exakter Treffer für 7TV / BTTV (Case-sensitive)
               if (thirdPartyEmotes[word]) {
                 emotePool.push(thirdPartyEmotes[word]);
-              } 
-              // Fallback für globale Twitch-Emotes (Kleingeschrieben)
-              else if (GLOBAL_EMOTES[word.toLowerCase()]) {
+              } else if (GLOBAL_EMOTES[word.toLowerCase()]) {
                 emotePool.push(`https://static-cdn.jtvnw.net/emoticons/v2/${GLOBAL_EMOTES[word.toLowerCase()]}/default/dark/3.0`);
               }
             });
@@ -160,23 +158,27 @@
       const container = document.getElementById('emote-container');
       const img = document.getElementById('emote-img');
 
-      if (emotePool.length > 0) {
-        const nextEmote = emotePool[emotePool.length - 1];
-        emotePool = [];
+      // Zeige neues Emote nur, wenn gerade keine Animation läuft und Nachschub da ist
+      if (emotePool.length > 0 && !isAnimating) {
+        isAnimating = true;
+        const nextEmote = emotePool.shift(); // Das älteste wartende Emote nehmen
 
-        if (nextEmote !== lastDisplayedEmote) {
-          lastDisplayedEmote = nextEmote;
+        container.classList.remove('show');
+        img.src = nextEmote;
+
+        // Kurzer Reset für die Animation
+        setTimeout(() => {
+          container.classList.add('show');
+        }, 50);
+
+        // Nach 4 Sekunden (Dauer der Animation) bereit machen fürs nächste Emote
+        setTimeout(() => {
           container.classList.remove('show');
-
-          setTimeout(() => {
-            img.src = lastDisplayedEmote;
-            container.classList.add('show');
-          }, 300);
-        }
+          isAnimating = false;
+        }, 4050);
       }
     }
 
-    // Startablauf
     loadThirdPartyEmotes();
     connectToTwitch();
     setInterval(updateDisplay, CHECK_INTERVAL);
