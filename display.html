@@ -42,6 +42,9 @@
     let lastDisplayedEmote = "";
     let pingInterval = null;
 
+    // Wörterbuch für Drittanbieter-Emotes (Wort -> Bild-URL)
+    const thirdPartyEmotes = {};
+
     const GLOBAL_EMOTES = {
       'lul': '425618',
       'kappa': '25',
@@ -53,6 +56,41 @@
       'biblethump': '86'
     };
 
+    // 1. Drittanbieter-Emotes laden (7TV & BTTV)
+    async function loadThirdPartyEmotes() {
+      try {
+        // Helix/Twitch ID für den Kanal abfragen via Decapi (Hilfs-API für unauthentifizierte IDs)
+        const idRes = await fetch(`https://decapi.me/twitch/id/${CHANNEL_NAME}`);
+        const userId = (await idRes.text()).trim();
+
+        if (userId && !isNaN(userId)) {
+          // BTTV Channel Emotes
+          fetch(`https://api.betterttv.net/3/cached/users/twitch/${userId}`)
+            .then(res => res.json())
+            .then(data => {
+              const bttvList = [...(data.channelEmotes || []), ...(data.sharedEmotes || [])];
+              bttvList.forEach(e => {
+                thirdPartyEmotes[e.code] = `https://cdn.betterttv.net/emote/${e.id}/3x`;
+              });
+            }).catch(() => {});
+
+          // 7TV Channel Emotes
+          fetch(`https://7tv.io/v3/users/twitch/${userId}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.emote_set && data.emote_set.emotes) {
+                data.emote_set.emotes.forEach(e => {
+                  thirdPartyEmotes[e.name] = `https://cdn.7tv.app/emote/${e.id}/4x.webp`;
+                });
+              }
+            }).catch(() => {});
+        }
+      } catch (err) {
+        // Stillschweigend fortfahren, falls API offline ist
+      }
+    }
+
+    // 2. Twitch Websocket Verbindung
     function connectToTwitch() {
       ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
 
@@ -78,7 +116,7 @@
         }
 
         if (message.includes('PRIVMSG')) {
-          // 1. Offizielle Twitch-Metadata Tags
+          // A) Offizielle Twitch-Metadata Tags
           const emoteMatch = message.match(/emotes=([^;]+)/);
           if (emoteMatch && emoteMatch[1] && emoteMatch[1].trim() !== '') {
             const emoteEntries = emoteMatch[1].split('/');
@@ -90,15 +128,20 @@
             });
           }
 
-          // 2. Text-Fallback für globale Emotes
+          // B) Text-Prüfung für BTTV, 7TV und Globale Emotes
           const chatParts = message.split(`PRIVMSG #${CHANNEL_NAME.toLowerCase()} :`);
           if (chatParts.length > 1) {
-            const chatText = chatParts[1].toLowerCase().trim();
+            const chatText = chatParts[1].trim();
             const words = chatText.split(/\s+/);
 
             words.forEach(word => {
-              if (GLOBAL_EMOTES[word]) {
-                emotePool.push(`https://static-cdn.jtvnw.net/emoticons/v2/${GLOBAL_EMOTES[word]}/default/dark/3.0`);
+              // Exakter Treffer für 7TV / BTTV (Case-sensitive)
+              if (thirdPartyEmotes[word]) {
+                emotePool.push(thirdPartyEmotes[word]);
+              } 
+              // Fallback für globale Twitch-Emotes (Kleingeschrieben)
+              else if (GLOBAL_EMOTES[word.toLowerCase()]) {
+                emotePool.push(`https://static-cdn.jtvnw.net/emoticons/v2/${GLOBAL_EMOTES[word.toLowerCase()]}/default/dark/3.0`);
               }
             });
           }
@@ -133,6 +176,8 @@
       }
     }
 
+    // Startablauf
+    loadThirdPartyEmotes();
     connectToTwitch();
     setInterval(updateDisplay, CHECK_INTERVAL);
   </script>
