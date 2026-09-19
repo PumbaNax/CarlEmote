@@ -34,98 +34,120 @@
 </head>
 <body>
 
-  <div id="status">Verbinde mit Twitch...</div>
+  <div id="status">Verbinde...</div>
 
   <div id="emote-container">
     <img id="emote-img" src="" alt="Emote">
   </div>
 
   <script>
-    const CHANNEL_NAME = 'pumbanax'; 
-    const INTERVAL_TIME = 10000;
-
+    const CHANNEL_NAME = 'carlzon_official';
+    const CHECK_INTERVAL = 3000;
+    
+    let ws = null;
     let emotePool = [];
     let lastDisplayedEmote = "";
+    let pingInterval = null;
 
     const statusEl = document.getElementById('status');
-    const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
 
-    ws.onopen = () => {
-      statusEl.innerText = "Verbunden! Warte auf Emotes...";
-      statusEl.style.color = "#00ff00";
-      ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
-      ws.send('NICK justinfan' + Math.floor(10000 + Math.random() * 90000));
-      ws.send(`JOIN #${CHANNEL_NAME.toLowerCase()}`);
-    };
+    function connectToTwitch() {
+      statusEl.innerText = "Verbinde mit #" + CHANNEL_NAME + "...";
+      statusEl.style.color = "#ffff00";
 
-    ws.onerror = (err) => {
-      statusEl.innerText = "Fehler bei der Verbindung!";
-      statusEl.style.color = "#ff0000";
-    };
+      ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
 
-    ws.onclose = () => {
-      statusEl.innerText = "Verbindung getrennt!";
-      statusEl.style.color = "#ffaa00";
-    };
+      ws.onopen = () => {
+        statusEl.innerText = "Verbunden mit #" + CHANNEL_NAME + "!";
+        statusEl.style.color = "#00ff00";
+        ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
+        ws.send('NICK justinfan' + Math.floor(10000 + Math.random() * 90000));
+        ws.send(`JOIN #${CHANNEL_NAME.toLowerCase()}`);
 
-    ws.onmessage = (event) => {
-      const message = event.data;
+        // Alle 30 Sekunden PING an Twitch senden, um Abbrechen zu verhindern
+        clearInterval(pingInterval);
+        pingInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send('PING :tmi.twitch.tv');
+          }
+        }, 30000);
+      };
 
-      if (message.startsWith('PING')) {
-        ws.send('PONG :tmi.twitch.tv');
-        return;
-      }
+      ws.onmessage = (event) => {
+        const message = event.data;
 
-      if (message.includes('PRIVMSG')) {
-        statusEl.innerText = "Nachricht empfangen!";
-        
-        const emoteMatch = message.match(/emotes=([^;]+)/);
-        if (emoteMatch && emoteMatch[1] && emoteMatch[1] !== '') {
-          const emoteEntries = emoteMatch[1].split('/');
-          emoteEntries.forEach(entry => {
-            const emoteId = entry.split(':')[0];
-            if (emoteId) {
-              emotePool.push(`https://static-cdn.jtvnw.net/emoticons/v2/${emoteId}/default/dark/3.0`);
+        if (message.startsWith('PING')) {
+          ws.send('PONG :tmi.twitch.tv');
+          return;
+        }
+
+        if (message.includes('PRIVMSG')) {
+          // Offizielle Twitch Emotes
+          const emoteMatch = message.match(/emotes=([^;]+)/);
+          if (emoteMatch && emoteMatch[1] && emoteMatch[1] !== '') {
+            const emoteEntries = emoteMatch[1].split('/');
+            emoteEntries.forEach(entry => {
+              const emoteId = entry.split(':')[0];
+              if (emoteId) {
+                emotePool.push(`https://static-cdn.jtvnw.net/emoticons/v2/${emoteId}/default/dark/3.0`);
+              }
+            });
+          }
+
+          // Fallback Emotes
+          const chatText = message.split(`PRIVMSG #${CHANNEL_NAME.toLowerCase()} :`)[1] || "";
+          const globalEmotes = {
+            'lul': '425618',
+            'kappa': '25',
+            'pogchamp': '305954156',
+            'heyguys': '30259'
+          };
+
+          const words = chatText.toLowerCase().trim().split(' ');
+          words.forEach(word => {
+            if (globalEmotes[word]) {
+              emotePool.push(`https://static-cdn.jtvnw.net/emoticons/v2/${globalEmotes[word]}/default/dark/3.0`);
             }
           });
         }
+      };
 
-        const chatText = message.split(`PRIVMSG #${CHANNEL_NAME.toLowerCase()} :`)[1] || "";
-        const globalEmotes = {
-          'lul': '425618',
-          'kappa': '25',
-          'pogchamp': '305954156',
-          'heyguys': '30259'
-        };
+      // Bei Verbindungsabbruch automatisch neu verbinden!
+      ws.onclose = () => {
+        statusEl.innerText = "Getrennt! Verbinde neu in 3s...";
+        statusEl.style.color = "#ff0000";
+        clearInterval(pingInterval);
+        setTimeout(connectToTwitch, 3000);
+      };
 
-        const words = chatText.toLowerCase().trim().split(' ');
-        words.forEach(word => {
-          if (globalEmotes[word]) {
-            emotePool.push(`https://static-cdn.jtvnw.net/emoticons/v2/${globalEmotes[word]}/default/dark/3.0`);
-          }
-        });
-      }
-    };
+      ws.onerror = () => {
+        ws.close();
+      };
+    }
 
-    function displayRandomEmote() {
+    function updateDisplay() {
       const container = document.getElementById('emote-container');
       const img = document.getElementById('emote-img');
 
       if (emotePool.length > 0) {
-        const randomIndex = Math.floor(Math.random() * emotePool.length);
-        lastDisplayedEmote = emotePool[randomIndex];
-        emotePool = []; 
+        const nextEmote = emotePool[emotePool.length - 1];
+        emotePool = [];
 
-        container.classList.remove('show');
+        if (nextEmote !== lastDisplayedEmote) {
+          lastDisplayedEmote = nextEmote;
+          container.classList.remove('show');
 
-        setTimeout(() => {
-          img.src = lastDisplayedEmote;
-          container.classList.add('show');
-        }, 500);
+          setTimeout(() => {
+            img.src = lastDisplayedEmote;
+            container.classList.add('show');
+          }, 300);
+        }
       }
     }
 
-    setInterval(displayRandomEmote, INTERVAL_TIME);
+    // Starten
+    connectToTwitch();
+    setInterval(updateDisplay, CHECK_INTERVAL);
   </script>
 </body>
 </html>
